@@ -1,0 +1,52 @@
+Vagrant.configure("2") do |config|
+    config.vm.box = "kalilinux/rolling"
+    config.vm.hostname = "edusec-kali"
+    
+    config.vm.provider "virtualbox" do |vb|
+      vb.memory = "4096"
+      vb.cpus = 2
+      vb.name = "EduSec-Kali-Linux"
+    end
+  
+    config.vm.network "forwarded_port", guest: 80, host: 8080
+    config.vm.network "forwarded_port", guest: 22, host: 2222
+    config.vm.network "forwarded_port", guest: 8080, host: 8081
+    
+    config.vm.provision "shell", inline: <<-SHELL
+      # Update system
+      apt-get update
+      apt-get upgrade -y
+      
+      # Install essential tools
+      apt-get install -y \
+        nmap \
+        sqlmap \
+        nikto \
+        gobuster \
+        metasploit-framework \
+        burpsuite \
+        wireshark \
+        john \
+        hashcat \
+        python3 \
+        python3-pip \
+        git \
+        docker.io \
+        docker-compose
+      
+      # Install additional Python tools
+      pip3 install requests beautifulsoup4 scapy
+      
+      # Configure Metasploit database
+      systemctl start postgresql
+      systemctl enable postgresql
+      msfdb init
+      
+      # Create student workspace
+      mkdir -p /home/vagrant/workspace
+      chown vagrant:vagrant /home/vagrant/workspace
+      
+      echo "EduSec Labs Kali Environment Ready!"
+      echo "Access your labs at http://localhost:8080"
+    SHELL
+  end
