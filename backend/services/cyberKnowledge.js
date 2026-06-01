@@ -79,5 +79,3 @@ function retrieveRelevant(message, max = 3) {
 }
 
 module.exports = { topics, retrieveRelevant };
-
-
