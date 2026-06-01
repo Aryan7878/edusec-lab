@@ -11,13 +11,17 @@ import VMInterface from './components/VMInterface';
 import Home from './components/Home';
 import Footer from './components/Footer';
 import ProtectedRoute from './components/ProtectedRoute';
+import Challenges from './components/Challenges';
+import Leaderboard from './components/Leaderboard';
+import { NotificationProvider } from './contexts/NotificationContext';
 import './App.css';
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <div className="App">
+    <NotificationProvider>
+      <AuthProvider>
+        <Router>
+          <div className="App">
           <Navbar />
           <div className="container mt-3 mt-md-4">
             <Routes>
@@ -28,13 +32,16 @@ function App() {
               <Route path="/labs" element={<ProtectedRoute><Labs /></ProtectedRoute>} />
               <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistant /></ProtectedRoute>} />
               <Route path="/kali-vm" element={<ProtectedRoute><VMInterface /></ProtectedRoute>} />
+              <Route path="/challenges" element={<ProtectedRoute><Challenges /></ProtectedRoute>} />
+              <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </div>
           <Footer />
         </div>
       </Router>
-    </AuthProvider>
+      </AuthProvider>
+    </NotificationProvider>
   );
 }
 

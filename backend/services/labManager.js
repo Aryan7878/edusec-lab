@@ -1,6 +1,7 @@
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
+const execFilePromise = util.promisify(execFile);
 
 /**
  * Manages lifecycle of lab containers (per user, per lab).
@@ -13,6 +14,7 @@ class LabManager {
     this.activeLabs = new Map();
     this.baseHttpPort = 8082; // starting range for host port mappings
     this.dockerCmd = this._resolveDockerCmd();
+    this.dockerPath = this._resolveDockerPath();
   }
 
   _resolveDockerCmd() {
@@ -30,6 +32,25 @@ class LabManager {
       try {
         const fs = require('fs');
         if (fs.existsSync(cand)) return `"${cand}"`;
+      } catch (_) { }
+    }
+    return 'docker';
+  }
+
+  _resolveDockerPath() {
+    const isWindows = process.platform === 'win32';
+    if (!isWindows) return 'docker';
+
+    const candidates = [
+      process.env.ProgramFiles + '\\Docker\\Docker\\resources\\bin\\docker.exe',
+      process.env.ProgramFiles + '\\Docker\\Docker\\resources\\docker.exe',
+      process.env.ProgramFiles + '\\Docker\\Docker\\bin\\docker.exe'
+    ].filter(Boolean);
+
+    for (const cand of candidates) {
+      try {
+        const fs = require('fs');
+        if (fs.existsSync(cand)) return cand;
       } catch (_) { }
     }
     return 'docker';
@@ -129,7 +150,7 @@ class LabManager {
     if (!info) return { status: 'stopped' };
     try {
       const { stdout } = await execPromise(`${this.dockerCmd} inspect -f '{{.State.Running}}' ${info.containerName}`);
-      const running = stdout.trim() === 'true';
+      const running = stdout.includes('true');
       return { ...info, status: running ? 'running' : 'stopped' };
     } catch (_) {
       this.activeLabs.delete(key);
@@ -147,8 +168,7 @@ class LabManager {
 
     try {
       // Execute command in the container
-      const execCmd = `${this.dockerCmd} exec ${info.containerName} /bin/sh -c ${JSON.stringify(command)}`;
-      const { stdout, stderr } = await execPromise(execCmd);
+      const { stdout, stderr } = await execFilePromise(this.dockerPath, ['exec', info.containerName, '/bin/sh', '-c', command]);
 
       // Combine stdout and stderr for terminal output
       let output = '';

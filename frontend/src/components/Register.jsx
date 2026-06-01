@@ -16,10 +16,7 @@ const Register = () => {
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
@@ -40,94 +37,93 @@ const Register = () => {
     }
 
     const result = await register(formData.username, formData.email, formData.password);
-    
     if (result.success) {
       navigate('/dashboard');
     } else {
       setError(result.message);
     }
-    
     setLoading(false);
   };
 
+  const fields = [
+    { id: 'username', label: 'Username', type: 'text', placeholder: 'Choose a username' },
+    { id: 'email', label: 'Email Address', type: 'email', placeholder: 'Enter your email' },
+    { id: 'password', label: 'Password', type: 'password', placeholder: 'Create a password (min. 6 characters)' },
+    { id: 'confirmPassword', label: 'Confirm Password', type: 'password', placeholder: 'Confirm your password' },
+  ];
+
   return (
-    <div className="row justify-content-center">
-      <div className="col-md-6 col-lg-5">
-        <div className="card shadow">
+    <div className="row justify-content-center" style={{ minHeight: '80vh', alignItems: 'center' }}>
+      <div className="col-md-6 col-lg-5 col-xl-4">
+        {/* Brand */}
+        <div className="text-center mb-4">
+          <div
+            className="d-inline-flex align-items-center justify-content-center mb-3"
+            style={{
+              width: 56, height: 56, borderRadius: 14,
+              background: 'linear-gradient(135deg, #7b61ff, rgba(123,97,255,0.5))',
+              boxShadow: '0 8px 24px rgba(123,97,255,0.35)'
+            }}
+          >
+            <i className="bi bi-shield-lock-fill" style={{ fontSize: '1.5rem', color: '#fff' }}></i>
+          </div>
+          <h2 style={{ color: '#f0f2f8', fontWeight: 700, fontSize: '1.65rem', marginBottom: '0.35rem' }}>
+            Join EduSec Labs
+          </h2>
+          <p style={{ color: 'rgba(240,242,248,0.55)', fontSize: '0.9rem', margin: 0 }}>
+            Create your free account to start learning
+          </p>
+        </div>
+
+        {/* Card */}
+        <div
+          className="card"
+          style={{
+            background: 'rgba(18, 22, 34, 0.85)',
+            border: '1px solid rgba(255,255,255,0.09)',
+            borderRadius: 18,
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.45), 0 0 0 1px rgba(123,97,255,0.07)',
+            animation: 'none'
+          }}
+        >
           <div className="card-body p-4">
-            <div className="text-center mb-4">
-              <h2 className="card-title">Join EduSec Labs</h2>
-              <p className="text-muted">Create your free account to start learning</p>
-            </div>
-            
             {error && (
-              <div className="alert alert-danger d-flex align-items-center" role="alert">
+              <div className="alert alert-danger d-flex align-items-center mb-4" role="alert">
                 <i className="bi bi-exclamation-triangle-fill me-2"></i>
-                {error}
+                <span style={{ fontSize: '0.875rem' }}>{error}</span>
               </div>
             )}
-            
+
             <form onSubmit={handleSubmit}>
-              <div className="mb-3">
-                <label htmlFor="username" className="form-label">Username</label>
-                <input
-                  type="text"
-                  className="form-control form-control-lg"
-                  id="username"
-                  name="username"
-                  value={formData.username}
-                  onChange={handleChange}
-                  required
-                  placeholder="Choose a username"
-                />
-              </div>
-              
-              <div className="mb-3">
-                <label htmlFor="email" className="form-label">Email Address</label>
-                <input
-                  type="email"
-                  className="form-control form-control-lg"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                  placeholder="Enter your email"
-                />
-              </div>
-              
-              <div className="mb-3">
-                <label htmlFor="password" className="form-label">Password</label>
-                <input
-                  type="password"
-                  className="form-control form-control-lg"
-                  id="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  required
-                  placeholder="Create a password (min. 6 characters)"
-                />
-              </div>
-              
-              <div className="mb-4">
-                <label htmlFor="confirmPassword" className="form-label">Confirm Password</label>
-                <input
-                  type="password"
-                  className="form-control form-control-lg"
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  required
-                  placeholder="Confirm your password"
-                />
-              </div>
-              
-              <button 
-                type="submit" 
-                className="btn btn-primary btn-lg w-100 py-2"
+              {fields.map(({ id, label, type, placeholder }, idx) => (
+                <div key={id} className={idx < fields.length - 1 ? 'mb-3' : 'mb-4'}>
+                  <label
+                    htmlFor={id}
+                    className="form-label"
+                    style={{ color: 'rgba(240,242,248,0.7)', fontSize: '0.85rem', fontWeight: 500 }}
+                  >
+                    {label}
+                  </label>
+                  <input
+                    type={type}
+                    className="form-control form-control-lg"
+                    id={id}
+                    name={id}
+                    value={formData[id]}
+                    onChange={handleChange}
+                    required
+                    placeholder={placeholder}
+                    style={{ fontSize: '0.95rem' }}
+                  />
+                </div>
+              ))}
+
+              <button
+                type="submit"
+                className="btn btn-primary btn-lg w-100"
                 disabled={loading}
+                style={{ borderRadius: 12, fontWeight: 600, letterSpacing: '0.02em', padding: '0.7rem' }}
               >
                 {loading ? (
                   <>
@@ -135,18 +131,29 @@ const Register = () => {
                     Creating Account...
                   </>
                 ) : (
-                  'Create Account'
+                  <>
+                    <i className="bi bi-person-plus-fill me-2"></i>
+                    Create Account
+                  </>
                 )}
               </button>
             </form>
-            
+
             <div className="text-center mt-4">
-              <p className="text-muted">
+              <span style={{ color: 'rgba(240,242,248,0.45)', fontSize: '0.875rem' }}>
                 Already have an account?{' '}
-                <Link to="/login" className="text-decoration-none fw-semibold">
-                  Sign in here
-                </Link>
-              </p>
+              </span>
+              <Link
+                to="/login"
+                style={{
+                  color: '#a490ff',
+                  fontWeight: 600,
+                  textDecoration: 'none',
+                  fontSize: '0.875rem'
+                }}
+              >
+                Sign in here
+              </Link>
             </div>
           </div>
         </div>

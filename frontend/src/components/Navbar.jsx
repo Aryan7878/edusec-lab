@@ -40,6 +40,8 @@ const Navbar = () => {
               <>
                 <li className="nav-item"><Link className={`nav-link ${isActive('/dashboard')}`} to="/dashboard">Dashboard</Link></li>
                 <li className="nav-item"><Link className={`nav-link ${isActive('/labs')}`} to="/labs">Labs</Link></li>
+                <li className="nav-item"><Link className={`nav-link ${isActive('/challenges')}`} to="/challenges">🚩 CTF</Link></li>
+                <li className="nav-item"><Link className={`nav-link ${isActive('/leaderboard')}`} to="/leaderboard">🏆 Ranks</Link></li>
                 <li className="nav-item"><Link className={`nav-link ${isActive('/kali-vm')}`} to="/kali-vm">Kali VM</Link></li>
                 <li className="nav-item"><Link className={`nav-link ${isActive('/ai-assistant')}`} to="/ai-assistant">AI Tutor</Link></li>
               </>

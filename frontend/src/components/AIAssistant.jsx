@@ -214,17 +214,17 @@ const AIAssistant = () => {
                     className={`d-flex mb-3 ${message.sender === 'user' ? 'justify-content-end' : 'justify-content-start'}`}
                   >
                     <div
-                      className={`rounded p-3 ${message.sender === 'user' ? 'bg-primary text-white' : 'bg-light border'}`}
+                      className={`rounded p-3 ${message.sender === 'user' ? 'msg-user' : 'msg-ai'}`}
                       style={{ maxWidth: '70%' }}
                     >
                       <div className="message-text" style={{ whiteSpace: 'pre-wrap' }}>
                         {message.text}
                       </div>
-                      
+
                       {message.hints && Array.isArray(message.hints) && message.sender === 'ai' && (
-                        <div className="mt-3 p-2 bg-white rounded border">
-                          <small className="text-muted fw-bold">💡 Suggested Steps:</small>
-                          <ul className="small mt-1 mb-0">
+                        <div className="ai-hints mt-3 p-2">
+                          <small className="text-white-50 fw-bold">💡 Suggested Steps:</small>
+                          <ul className="small mt-1 mb-0" style={{color:'rgba(240,242,248,0.7)'}}>
                             {message.hints.map((hint, index) => (
                               <li key={index}>{hint}</li>
                             ))}
@@ -232,12 +232,12 @@ const AIAssistant = () => {
                         </div>
                       )}
                       {message.usedModel && (
-                        <small className="text-success d-block mt-2">
+                        <small style={{color:'#86efac'}} className="d-block mt-2">
                           <i className="bi bi-stars me-1"></i>
                           Powered by {message.usedModel}
                         </small>
                       )}
-                      
+
                       <small className="text-muted d-block mt-2">
                         <i className="bi bi-clock me-1"></i>
                         {message.timestamp.toLocaleTimeString()}
@@ -248,9 +248,9 @@ const AIAssistant = () => {
                 
                 {loading && (
                   <div className="d-flex justify-content-start mb-3">
-                    <div className="bg-light rounded p-3 border">
+                    <div className="ai-thinking p-3">
                       <div className="spinner-border spinner-border-sm me-2 text-primary"></div>
-                      <span className="text-muted">AI Tutor is thinking...</span>
+                      <span className="text-white-50">AI Tutor is thinking...</span>
                     </div>
                   </div>
                 )}
@@ -259,8 +259,8 @@ const AIAssistant = () => {
               </div>
 
               {/* Quick actions */}
-              <div className="p-3 border-top">
-                <small className="text-muted fw-bold">
+              <div className="p-3 quick-actions-area">
+                <small className="text-white-50 fw-bold">
                   <i className="bi bi-lightning me-1"></i>
                   Quick questions:
                 </small>
@@ -278,7 +278,7 @@ const AIAssistant = () => {
               </div>
 
               {/* Message input */}
-              <div className="p-3 border-top bg-light">
+              <div className="p-3 chat-input-area">
                 <form onSubmit={sendMessage}>
                   <div className="row g-2">
                     <div className="col-md-3">

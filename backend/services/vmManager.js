@@ -1,6 +1,7 @@
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 const util = require('util');
 const execPromise = util.promisify(exec);
+const execFilePromise = util.promisify(execFile);
 
 class VMManager {
   constructor() {
@@ -40,8 +41,8 @@ class VMManager {
       await this._checkDockerConnection();
 
       // If already running, return existing
-      if (this.activeVMs.has(userId)) {
-        return this.activeVMs.get(userId);
+      if (this.activeVMs.has(String(userId))) {
+        return this.activeVMs.get(String(userId));
       }
 
       const dockerCmd = this._resolveDockerCmd();
@@ -83,7 +84,38 @@ class VMManager {
         startedAt: new Date()
       };
 
-      this.activeVMs.set(userId, vmDetails);
+      this.activeVMs.set(String(userId), vmDetails);
+
+      // Asynchronously install bash, sudo, nmap, curl, hydra, john, python3, git, sqlmap, wordlist, and apt wrapper in the background
+      console.log(`VMManager: Provisioning container ${containerName} with advanced security tools...`);
+      (async () => {
+        const dockerPath = this._resolveDockerPath();
+        const path = require('path');
+        
+        // 1. Install base utilities and packages (no gobuster)
+        await execFilePromise(dockerPath, ['exec', containerName, 'sh', '-c', 'apk update && apk add --no-cache bash sudo nmap curl hydra john python3 git']);
+        
+        // 2. Download and install precompiled Gobuster from GitHub releases
+        await execFilePromise(dockerPath, ['exec', containerName, 'sh', '-c', 'curl -L -o /tmp/gobuster.tar.gz https://github.com/OJ/gobuster/releases/download/v3.6.0/gobuster_Linux_x86_64.tar.gz && tar -xzf /tmp/gobuster.tar.gz -C /tmp && mv /tmp/gobuster /usr/bin/gobuster && chmod +x /usr/bin/gobuster']);
+        
+        // 3. Copy the apt wrapper script from host to container
+        const hostWrapperPath = path.resolve(__dirname, '../scripts/apt_wrapper.sh');
+        await execFilePromise(dockerPath, ['cp', hostWrapperPath, `${containerName}:/usr/bin/apt`]);
+        
+        // 4. Configure permissions, symlinks, and folders
+        await execFilePromise(dockerPath, ['exec', containerName, 'sh', '-c', 'chmod +x /usr/bin/apt && ln -sf /usr/bin/apt /usr/bin/apt-get && ln -sf /usr/bin/python3 /usr/bin/python']);
+        
+        // 5. Clone and install sqlmap
+        await execFilePromise(dockerPath, ['exec', containerName, 'sh', '-c', 'git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git /usr/share/sqlmap && ln -sf /usr/share/sqlmap/sqlmap.py /usr/bin/sqlmap']);
+        
+        // 6. Download and install wordlist (rockyou.txt)
+        await execFilePromise(dockerPath, ['exec', containerName, 'sh', '-c', 'mkdir -p /usr/share/wordlists && curl -L -o /usr/share/wordlists/rockyou.txt https://raw.githubusercontent.com/danielmiessler/SecLists/master/Passwords/Common-Credentials/10k-most-common.txt']);
+        
+        console.log(`VMManager: Successfully provisioned security tools, sudo, apt wrappers, sqlmap, wordlists, and gobuster in VM ${containerName}`);
+      })()
+        .catch(err => {
+          console.error(`VMManager: Failed to provision tools in VM ${containerName}:`, err.message || err);
+        });
 
       // Verify container is actually running
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -136,7 +168,7 @@ class VMManager {
 
   async stopKaliVM(userId) {
     try {
-      const vm = this.activeVMs.get(userId);
+      const vm = this.activeVMs.get(String(userId));
       if (!vm) return { success: true };
 
       const dockerCmd = this._resolveDockerCmd();
@@ -148,7 +180,7 @@ class VMManager {
         console.warn('VMManager: Error removing container', err.message || err);
       }
 
-      this.activeVMs.delete(userId);
+      this.activeVMs.delete(String(userId));
       return { success: true };
     } catch (error) {
       console.error('VMManager: Error stopping VM:', error);
@@ -157,14 +189,14 @@ class VMManager {
   }
 
   async getVMStatus(userId) {
-    const vm = this.activeVMs.get(userId);
+    const vm = this.activeVMs.get(String(userId));
     if (!vm) {
       // Check if container exists but isn't in our map (e.g., after restart)
       const containerName = `edusec_kali_${userId}`;
       try {
         const dockerCmd = this._resolveDockerCmd();
         const { stdout } = await execPromise(`${dockerCmd} inspect -f '{{.State.Running}}' ${containerName}`);
-        const running = stdout.trim() === 'true';
+        const running = stdout.includes('true');
         if (running) {
           // Container exists and is running, recover the VM details
           const { stdout: portOut } = await execPromise(`${dockerCmd} inspect -f '{{range .NetworkSettings.Ports}}{{range .}}{{.HostPort}}{{end}}{{end}}' ${containerName}`);
@@ -177,7 +209,7 @@ class VMManager {
             guacamoleUrl: null,
             startedAt: new Date()
           };
-          this.activeVMs.set(userId, recovered);
+          this.activeVMs.set(String(userId), recovered);
           return recovered;
         } else {
           // Container exists but is stopped, clean it up
@@ -192,11 +224,11 @@ class VMManager {
     try {
       const dockerCmd = this._resolveDockerCmd();
       const { stdout } = await execPromise(`${dockerCmd} inspect -f '{{.State.Running}}' ${vm.containerName}`);
-      const running = stdout.trim() === 'true';
+      const running = stdout.includes('true');
       return { ...vm, status: running ? 'running' : 'stopped' };
     } catch (err) {
       // container might have exited
-      this.activeVMs.delete(userId);
+      this.activeVMs.delete(String(userId));
       return { status: 'stopped' };
     }
   }
@@ -220,18 +252,45 @@ class VMManager {
     return 'docker';
   }
 
+  _resolveDockerPath() {
+    const isWindows = process.platform === 'win32';
+    if (!isWindows) return 'docker';
+
+    const candidates = [
+      process.env.ProgramFiles + '\\Docker\\Docker\\resources\\bin\\docker.exe',
+      process.env.ProgramFiles + '\\Docker\\Docker\\resources\\docker.exe',
+      process.env.ProgramFiles + '\\Docker\\Docker\\bin\\docker.exe'
+    ].filter(Boolean);
+
+    for (const cand of candidates) {
+      try {
+        const fs = require('fs');
+        if (fs.existsSync(cand)) return cand;
+      } catch (_) {}
+    }
+    return 'docker';
+  }
+
   async executeCommand(userId, command) {
-    const vm = this.activeVMs.get(userId);
+    const vm = this.activeVMs.get(String(userId));
     if (!vm) {
       throw new Error('VM is not running');
     }
 
     try {
-      const dockerCmd = this._resolveDockerCmd();
-      // Execute command in container as root (since rastasheep/ubuntu-sshd runs as root by default)
-      // For real Kali, we'd use: docker exec -it container bash -c "command"
-      const execCmd = `${dockerCmd} exec ${vm.containerName} bash -c ${JSON.stringify(command)}`;
-      const { stdout, stderr } = await execPromise(execCmd, { maxBuffer: 1024 * 1024 * 10 });
+      const dockerPath = this._resolveDockerPath();
+      
+      // Dynamically detect if bash is available, otherwise fall back to sh
+      let shell = 'sh';
+      try {
+        await execFilePromise(dockerPath, ['exec', vm.containerName, 'which', 'bash'], { timeout: 1500 });
+        shell = 'bash';
+      } catch (_) {
+        // bash is not yet installed or not found, use sh
+      }
+
+      // Execute command in container as root
+      const { stdout, stderr } = await execFilePromise(dockerPath, ['exec', vm.containerName, shell, '-c', command], { maxBuffer: 1024 * 1024 * 10 });
       
       return {
         success: true,

@@ -1,12 +1,26 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotification } from '../contexts/NotificationContext';
 import axios from 'axios';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 
+const T = '#f0f2f8';          // bright text
+const T2 = 'rgba(240,242,248,0.65)';  // secondary
+const T3 = 'rgba(240,242,248,0.42)';  // muted
+
+const cardBase = {
+  background: 'rgba(18,22,34,0.82)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 16,
+  backdropFilter: 'blur(16px)',
+  animation: 'none',
+};
+
 export default function VMInterface() {
   const { user } = useAuth();
+  const { showNotification } = useNotification();
   const [mounted, setMounted] = useState(false);
   const [vmStatus, setVmStatus] = useState('stopped');
   const [loading, setLoading] = useState(false);
@@ -83,12 +97,26 @@ export default function VMInterface() {
     fitAddon.current = new FitAddon();
     term.loadAddon(fitAddon.current);
     term.open(terminalRef.current);
-    fitAddon.current.fit();
+    
+    // Delayed fit ensures that the terminal parses sizes correctly after mount
+    setTimeout(() => {
+      if (fitAddon.current) {
+        try {
+          fitAddon.current.fit();
+        } catch (e) {
+          console.error('Fit error:', e);
+        }
+      }
+    }, 150);
 
     // Handle window resize
     const handleResize = () => {
       if (fitAddon.current) {
-        fitAddon.current.fit();
+        try {
+          fitAddon.current.fit();
+        } catch (e) {
+          console.error(e);
+        }
       }
     };
     window.addEventListener('resize', handleResize);
@@ -172,13 +200,13 @@ export default function VMInterface() {
       if (response.data.success) {
         const output = response.data.output || '';
         if (output) {
-          terminal.current.write(output);
+          terminal.current.write(output.replace(/\r?\n/g, '\r\n'));
         }
       } else {
-        terminal.current.write(`\x1b[31mError: ${response.data.output}\x1b[0m`);
+        terminal.current.write(`\x1b[31mError: ${(response.data.output || '').replace(/\r?\n/g, '\r\n')}\x1b[0m`);
       }
     } catch (error) {
-      terminal.current.write(`\x1b[31mError executing command: ${error.response?.data?.message || error.message}\x1b[0m`);
+      terminal.current.write(`\x1b[31mError executing command: ${(error.response?.data?.message || error.message || '').replace(/\r?\n/g, '\r\n')}\x1b[0m`);
     }
     
     terminal.current.write('\r\n\x1b[36mroot@kali:~# \x1b[0m');
@@ -209,6 +237,26 @@ export default function VMInterface() {
           if (statusResponse.data.status === 'running') {
             clearInterval(checkInterval);
             setLoading(false);
+            showNotification({
+              type: 'success',
+              title: 'VM Started Successfully',
+              message: 'Your personal Kali Linux VM is now active and ready.',
+              duration: 4000
+            });
+          } else if (statusResponse.data.status === 'stopped') {
+            clearInterval(checkInterval);
+            setVmStatus('stopped');
+            setLoading(false);
+            showNotification({
+              type: 'error',
+              title: 'VM Failed to Start',
+              message: 'The virtual machine container exited or failed to start.',
+              solutions: [
+                'Ensure Docker Desktop is open and showing "Docker is running".',
+                'Verify no other containers are using the same port resources.',
+                'Click "Start VM" again to retry.'
+              ]
+            });
           } else if (attempts >= maxAttempts) {
             clearInterval(checkInterval);
             setVmStatus('stopped');
@@ -218,12 +266,38 @@ export default function VMInterface() {
             try {
               const finalStatus = await axios.get('/api/vm/status');
               if (finalStatus.data.status === 'stopped' && finalStatus.data.error) {
-                alert(`❌ VM failed to start after ${maxAttempts} seconds.\n\nError: ${finalStatus.data.error}\n\nPlease check Docker Desktop is running and try again.`);
+                showNotification({
+                  type: 'error',
+                  title: 'VM Initialization Timeout',
+                  message: `The virtual machine container failed to start after ${maxAttempts} seconds.`,
+                  details: finalStatus.data.error,
+                  solutions: [
+                    'Verify that Docker Desktop is actively running.',
+                    'Check for container port conflicts or resource restrictions in Docker Desktop settings.',
+                    'Restart Docker Desktop and try launching the VM again.'
+                  ]
+                });
               } else {
-                alert(`❌ VM failed to start after ${maxAttempts} seconds.\n\nThe container may be taking longer than expected, or there was an issue.\n\n💡 Solutions:\n1. Check Docker Desktop is running\n2. Wait a moment and try again\n3. Check Docker logs if the problem persists`);
+                showNotification({
+                  type: 'error',
+                  title: 'VM Failed to Start',
+                  message: `The virtual machine container failed to start after ${maxAttempts} seconds.`,
+                  solutions: [
+                    'Ensure Docker Desktop is running.',
+                    'Wait a moment and try again.',
+                    'Check Docker logs if the problem persists.'
+                  ]
+                });
               }
             } catch (err) {
-              alert(`❌ VM failed to start after ${maxAttempts} seconds.\n\nPlease check Docker Desktop is running and try again.`);
+              showNotification({
+                type: 'error',
+                title: 'VM Failed to Start',
+                message: `The virtual machine container failed to start after ${maxAttempts} seconds.`,
+                solutions: [
+                  'Please check Docker Desktop is running and try again.'
+                ]
+              });
             }
           }
         } catch (err) {
@@ -232,7 +306,12 @@ export default function VMInterface() {
             clearInterval(checkInterval);
             setVmStatus('stopped');
             setLoading(false);
-            alert(`❌ VM failed to start: Unable to check VM status.\n\nError: ${err.message || 'Connection error'}`);
+            showNotification({
+              type: 'error',
+              title: 'VM Connection Error',
+              message: 'Unable to check VM status. Connection error.',
+              details: err.message || 'Connection error'
+            });
           }
         }
       }, 1000);
@@ -245,11 +324,39 @@ export default function VMInterface() {
       
       // Show user-friendly error message
       if (errorMsg.includes('Docker Desktop')) {
-        alert(`❌ ${errorMsg}\n\n💡 Solution:\n1. Open Docker Desktop\n2. Wait for it to show "Docker is running"\n3. Try again`);
+        showNotification({
+          type: 'error',
+          title: 'Docker Desktop Offline',
+          message: errorMsg,
+          solutions: [
+            'Open Docker Desktop.',
+            'Wait for the Docker icon to turn green ("Docker is running").',
+            'Try launching the VM again.'
+          ]
+        });
       } else if (errorMsg.includes('Conflict') || errorMsg.includes('already in use')) {
-        alert(`❌ Container name conflict.\n\nThe system should have handled this automatically. Please try again, or manually remove the container:\n\n${errorMsg}\n\n💡 Try clicking "Start VM" again - it should work now.`);
+        showNotification({
+          type: 'error',
+          title: 'Container Name Conflict',
+          message: 'A container with the same name or port already exists.',
+          details: errorMsg,
+          solutions: [
+            'Try clicking "Start VM" again - the system should auto-resolve this.',
+            'Manually stop or remove the conflicting container in Docker Desktop.',
+            'Restart Docker Desktop.'
+          ]
+        });
       } else {
-        alert(`❌ Failed to start VM: ${errorMsg}\n\n💡 Please check:\n1. Docker Desktop is running\n2. You have enough disk space\n3. No firewall is blocking Docker`);
+        showNotification({
+          type: 'error',
+          title: 'Failed to Start VM',
+          message: errorMsg,
+          solutions: [
+            'Docker Desktop is running',
+            'You have enough disk space',
+            'No firewall is blocking Docker'
+          ]
+        });
       }
       setLoading(false);
       setVmStatus('stopped');
@@ -272,9 +379,20 @@ export default function VMInterface() {
       commandHistory.current = [];
       historyIndex.current = -1;
       currentLine.current = '';
+      showNotification({
+        type: 'success',
+        title: 'VM Stopped',
+        message: 'Your personal Kali Linux VM has been successfully turned off.',
+        duration: 4000
+      });
     } catch (error) {
       console.error('Error stopping VM:', error);
-      alert(`Failed to stop VM: ${error.response?.data?.error || error.message}`);
+      showNotification({
+        type: 'error',
+        title: 'Failed to Stop VM',
+        message: 'An error occurred while attempting to spin down the container VM.',
+        details: error.response?.data?.error || error.message
+      });
     } finally {
       setLoading(false);
     }
@@ -311,8 +429,8 @@ export default function VMInterface() {
     <div className={mounted ? 'mounted' : ''}>
       <div className="row mb-4">
         <div className="col">
-          <h1 className="text-white">Kali Linux VM</h1>
-          <p className="lead text-white-50">
+          <h1 style={{ color: T, fontWeight: 700 }}>Kali Linux VM</h1>
+          <p className="lead" style={{ color: T2 }}>
             Access your personal Kali Linux environment - Just like TryHackMe!
           </p>
         </div>
@@ -321,23 +439,23 @@ export default function VMInterface() {
       {/* VM Status Card */}
       <div className="row mb-4">
         <div className="col-md-6">
-          <div className="card">
-            <div className="card-header">
-              <h5 className="mb-0">
-                <i className="bi bi-hdd me-2"></i>
+          <div className="card" style={cardBase}>
+            <div className="card-header" style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <h5 className="mb-0" style={{ color: T, fontWeight: 700 }}>
+                <i className="bi bi-hdd me-2" style={{ color: '#a490ff' }}></i>
                 Virtual Machine Status
               </h5>
             </div>
-            <div className="card-body">
+            <div className="card-body p-4">
               <div className="row align-items-center">
                 <div className="col">
                   <div className="d-flex align-items-center">
                     <span className={`badge bg-${getStatusColor(vmStatus)} me-3`} style={{ width: '12px', height: '12px', padding: 0, borderRadius: '50%' }}></span>
                     <div>
-                      <h4 className={`text-${getStatusColor(vmStatus)} mb-0`}>
+                      <h4 className={`text-${getStatusColor(vmStatus)} mb-0`} style={{ fontWeight: 800 }}>
                         {getStatusText(vmStatus)}
                       </h4>
-                      <small className="text-muted">
+                      <small style={{ color: T2 }}>
                         {getStatusDesc(vmStatus)}
                       </small>
                     </div>
@@ -347,6 +465,7 @@ export default function VMInterface() {
                   {vmStatus === 'stopped' ? (
                     <button
                       className="btn btn-success btn-lg"
+                      style={{ borderRadius: 12, padding: '10px 24px', fontWeight: 600 }}
                       onClick={startVM}
                       disabled={loading || !dockerHealthy}
                     >
@@ -365,6 +484,7 @@ export default function VMInterface() {
                   ) : (
                     <button
                       className="btn btn-danger"
+                      style={{ borderRadius: 12, padding: '10px 24px', fontWeight: 600 }}
                       onClick={stopVM}
                       disabled={loading}
                     >
@@ -385,14 +505,14 @@ export default function VMInterface() {
               </div>
 
               {vmDetails && vmDetails.sshPort && (
-                <div className="mt-3 p-3 bg-light rounded">
-                  <h6>Connection Details:</h6>
+                <div className="mt-3 p-3 ssh-details-panel">
+                  <h6 style={{color:'#a490ff', fontWeight: 700}}><i className="bi bi-terminal me-2"></i>Connection Details</h6>
                   <div className="row small">
                     <div className="col-md-12">
-                      <strong>SSH Access:</strong><br/>
-                      <code className="text-primary">ssh root@localhost -p {vmDetails.sshPort}</code>
+                      <span style={{ color: T2 }}>SSH Access:</span><br/>
+                      <code style={{color:'#67e8f9', background: 'rgba(0,0,0,0.2)', padding: '2px 6px', borderRadius: 4, display: 'inline-block', marginTop: 4}}>ssh root@localhost -p {vmDetails.sshPort}</code>
                       <br/>
-                      <small className="text-muted">Password: root (default)</small>
+                      <small style={{ color: T3, marginTop: 4, display: 'inline-block' }}>Password: root (default)</small>
                     </div>
                   </div>
                 </div>
@@ -400,10 +520,10 @@ export default function VMInterface() {
             </div>
 
             {!dockerHealthy && (
-              <div className="alert alert-warning mx-3 mb-0">
+              <div className="alert alert-warning mx-3 mb-3">
                 <i className="bi bi-exclamation-triangle me-2"></i>
                 <strong>Docker Desktop is not running.</strong> Please start Docker Desktop and wait for it to fully load.
-                <button className="btn btn-sm btn-outline-primary ms-2" onClick={checkDockerHealth}>
+                <button className="btn btn-sm btn-outline-primary ms-2" onClick={checkDockerHealth} style={{ borderRadius: 6 }}>
                   <i className="bi bi-arrow-clockwise me-1"></i>Check Again
                 </button>
               </div>
@@ -412,51 +532,63 @@ export default function VMInterface() {
         </div>
 
         <div className="col-md-6">
-          <div className="card h-100">
-            <div className="card-header">
-              <h5 className="mb-0">
-                <i className="bi bi-info-circle me-2"></i>
+          <div className="card h-100" style={cardBase}>
+            <div className="card-header" style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <h5 className="mb-0" style={{ color: T, fontWeight: 700 }}>
+                <i className="bi bi-info-circle me-2" style={{ color: '#a490ff' }}></i>
                 Available Tools
               </h5>
             </div>
-            <div className="card-body">
-              <div className="row small">
-                <div className="col-6 mb-2">
-                  <i className="bi bi-check-circle text-success me-1"></i>
-                  nmap
-                </div>
-                <div className="col-6 mb-2">
-                  <i className="bi bi-check-circle text-success me-1"></i>
-                  metasploit
-                </div>
-                <div className="col-6 mb-2">
-                  <i className="bi bi-check-circle text-success me-1"></i>
-                  burpsuite
-                </div>
-                <div className="col-6 mb-2">
-                  <i className="bi bi-check-circle text-success me-1"></i>
-                  sqlmap
-                </div>
-                <div className="col-6 mb-2">
-                  <i className="bi bi-check-circle text-success me-1"></i>
-                  john
-                </div>
-                <div className="col-6 mb-2">
-                  <i className="bi bi-check-circle text-success me-1"></i>
-                  wireshark
-                </div>
-                <div className="col-6 mb-2">
-                  <i className="bi bi-check-circle text-success me-1"></i>
-                  gobuster
-                </div>
-                <div className="col-6 mb-2">
-                  <i className="bi bi-check-circle text-success me-1"></i>
-                  hydra
+            <div className="card-body p-4">
+              <div className="mb-4">
+                <h6 style={{ color: '#7b61ff', fontWeight: 700, fontSize: '0.8rem', letterSpacing: '0.05em' }} className="mb-2">🚀 INSTALLED IN WEB TERMINAL:</h6>
+                <div className="row small">
+                  <div className="col-6 mb-2" style={{ color: T2 }}>
+                    <i className="bi bi-check-circle text-success me-1"></i>
+                    nmap (Network Scanning)
+                  </div>
+                  <div className="col-6 mb-2" style={{ color: T2 }}>
+                    <i className="bi bi-check-circle text-success me-1"></i>
+                    gobuster (Directory Busting)
+                  </div>
+                  <div className="col-6 mb-2" style={{ color: T2 }}>
+                    <i className="bi bi-check-circle text-success me-1"></i>
+                    hydra (Brute Forcer)
+                  </div>
+                  <div className="col-6 mb-2" style={{ color: T2 }}>
+                    <i className="bi bi-check-circle text-success me-1"></i>
+                    john (Password Cracking)
+                  </div>
+                  <div className="col-6 mb-2" style={{ color: T2 }}>
+                    <i className="bi bi-check-circle text-success me-1"></i>
+                    curl & python3
+                  </div>
                 </div>
               </div>
-              <div className="mt-2">
-                <small className="text-muted">
-                  Full Linux environment pre-configured and ready to use.
+              <div className="mb-3">
+                <h6 style={{ color: '#f59e0b', fontWeight: 700, fontSize: '0.8rem', letterSpacing: '0.05em' }} className="mb-2">💻 USE EXTERNAL KALI VM FOR:</h6>
+                <div className="row small">
+                  <div className="col-6 mb-1" style={{ color: T3 }}>
+                    <i className="bi bi-laptop me-1"></i>
+                    metasploit
+                  </div>
+                  <div className="col-6 mb-1" style={{ color: T3 }}>
+                    <i className="bi bi-laptop me-1"></i>
+                    burpsuite (GUI)
+                  </div>
+                  <div className="col-6 mb-1" style={{ color: T3 }}>
+                    <i className="bi bi-laptop me-1"></i>
+                    wireshark (GUI)
+                  </div>
+                  <div className="col-6 mb-1" style={{ color: T3 }}>
+                    <i className="bi bi-laptop me-1"></i>
+                    sqlmap
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3">
+                <small style={{ color: T3, fontSize: '0.8rem' }}>
+                  💡 In-browser terminal starts an Alpine container and auto-provisions hacking packages dynamically. Use your manual VirtualBox Kali VM for full-featured GUI tools!
                 </small>
               </div>
             </div>
@@ -466,21 +598,21 @@ export default function VMInterface() {
 
       {/* Terminal Interface */}
       {vmStatus === 'running' && (
-        <div className="card">
-          <div className="card-header d-flex justify-content-between align-items-center">
-            <h5 className="mb-0">
+        <div className="card terminal-card mb-4" style={{ border: '1px solid rgba(0, 255, 0, 0.2)', background: '#0d0f12', borderRadius: 16 }}>
+          <div className="card-header d-flex justify-content-between align-items-center" style={{ background: 'rgba(0, 255, 0, 0.03)', borderBottom: '1px solid rgba(0, 255, 0, 0.15)' }}>
+            <h5 className="mb-0" style={{ color: '#00ff00', fontWeight: 700 }}>
               <i className="bi bi-terminal me-2"></i>
               Web Terminal
             </h5>
-            <small className="text-muted">Interactive terminal - Type commands directly</small>
+            <small style={{ color: 'rgba(0, 255, 0, 0.65)' }}>Interactive terminal - Type commands directly</small>
           </div>
-          <div className="card-body p-0">
+          <div className="card-body p-0 terminal-container">
             <div 
               ref={terminalRef}
               style={{ 
                 height: '500px', 
-                padding: '10px',
-                backgroundColor: '#1e1e1e'
+                backgroundColor: '#0d0f12',
+                overflow: 'hidden'
               }}
             />
           </div>
@@ -490,32 +622,32 @@ export default function VMInterface() {
       {/* Quick Start Guide */}
       <div className="row mt-4">
         <div className="col-12">
-          <div className="card">
-            <div className="card-header">
-              <h5 className="mb-0">
-                <i className="bi bi-lightbulb me-2"></i>
+          <div className="card" style={cardBase}>
+            <div className="card-header" style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <h5 className="mb-0" style={{ color: T, fontWeight: 700 }}>
+                <i className="bi bi-lightbulb me-2" style={{ color: '#a490ff' }}></i>
                 Quick Start Guide
               </h5>
             </div>
-            <div className="card-body">
+            <div className="card-body p-4">
               <div className="row">
-                <div className="col-md-4 mb-3">
-                  <h6>1. Start the VM</h6>
-                  <p className="small text-muted">
+                <div className="col-md-4 mb-3 mb-md-0">
+                  <h6 style={{ color: T, fontWeight: 600 }}>1. Start the VM</h6>
+                  <p className="small" style={{ color: T2, marginBottom: 0 }}>
                     Click "Start VM" to launch your Kali Linux environment. 
                     This may take a few moments.
                   </p>
                 </div>
-                <div className="col-md-4 mb-3">
-                  <h6>2. Use the Terminal</h6>
-                  <p className="small text-muted">
+                <div className="col-md-4 mb-3 mb-md-0">
+                  <h6 style={{ color: T, fontWeight: 600 }}>2. Use the Terminal</h6>
+                  <p className="small" style={{ color: T2, marginBottom: 0 }}>
                     Type commands directly in the web terminal. All commands are 
                     executed in real-time on your VM.
                   </p>
                 </div>
-                <div className="col-md-4 mb-3">
-                  <h6>3. Practice Safely</h6>
-                  <p className="small text-muted">
+                <div className="col-md-4">
+                  <h6 style={{ color: T, fontWeight: 600 }}>3. Practice Safely</h6>
+                  <p className="small" style={{ color: T2, marginBottom: 0 }}>
                     All activities are contained within the VM. 
                     Experiment safely with various security tools.
                   </p>
