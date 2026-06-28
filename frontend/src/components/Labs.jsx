@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
@@ -38,6 +38,71 @@ const Labs = () => {
   const [mounted, setMounted] = useState(false);
   const [activeLab, setActiveLab] = useState(null);
   const [selectedLab, setSelectedLab] = useState(null);
+  const [remainingMs, setRemainingMs] = useState(null);  // ms left before auto-stop
+
+  // ── Heartbeat: keep active lab alive, update countdown ──────────────────────
+  const heartbeatRef = useRef(null);
+  const countdownRef = useRef(null);
+
+  useEffect(() => {
+    // Clear any previous intervals
+    clearInterval(heartbeatRef.current);
+    clearInterval(countdownRef.current);
+
+    if (!activeLab?.id) {
+      setRemainingMs(null);
+      return;
+    }
+
+    // Send heartbeat every 3 minutes
+    const sendHeartbeat = async () => {
+      try {
+        const res = await axios.post(`/api/labs/${activeLab.id}/heartbeat`);
+        if (res.data?.remainingMs !== undefined) {
+          setRemainingMs(res.data.remainingMs);
+        }
+      } catch (_) {
+        // Lab may have been auto-stopped — reflect that in the UI
+        setActiveLab(null);
+        setRemainingMs(null);
+        setLabs(prev => prev.map(l =>
+          l._id === activeLab.id
+            ? { ...l, userProgress: { ...l.userProgress, status: 'not_started' } }
+            : l
+        ));
+        showNotification({
+          type: 'warning',
+          title: 'Lab Session Expired',
+          message: 'Your lab was automatically stopped due to inactivity. Start it again to continue.',
+        });
+      }
+    };
+
+    // First heartbeat immediately after lab starts
+    sendHeartbeat();
+    heartbeatRef.current = setInterval(sendHeartbeat, 3 * 60 * 1000);
+
+    // Local countdown tick every second for the UI
+    countdownRef.current = setInterval(() => {
+      setRemainingMs(prev => (prev !== null ? Math.max(0, prev - 1000) : null));
+    }, 1000);
+
+    return () => {
+      clearInterval(heartbeatRef.current);
+      clearInterval(countdownRef.current);
+    };
+  }, [activeLab?.id]);
+
+  // Format ms → "mm:ss"
+  const fmtCountdown = (ms) => {
+    if (ms === null) return null;
+    const totalSec = Math.ceil(ms / 1000);
+    const m = Math.floor(totalSec / 60).toString().padStart(2, '0');
+    const s = (totalSec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
+  const isExpiringSoon = remainingMs !== null && remainingMs <= 5 * 60 * 1000;
 
   useEffect(() => {
     fetchLabs();
@@ -82,6 +147,10 @@ const Labs = () => {
             name: selected.name,
             accessUrl: response.data.lab.accessUrl
           });
+          // Seed initial countdown from the server response
+          if (response.data.lab.timeoutMs) {
+            setRemainingMs(response.data.lab.timeoutMs);
+          }
         }
         showNotification({
           type: 'success',
@@ -121,6 +190,11 @@ const Labs = () => {
             : lab
         )
       );
+      // Clear active lab and countdown if it was the stopped one
+      if (activeLab?.id === labId) {
+        setActiveLab(null);
+        setRemainingMs(null);
+      }
       showNotification({
         type: 'success',
         title: 'Lab Stopped Successfully',
@@ -191,6 +265,58 @@ const Labs = () => {
 
   return (
     <div>
+      {/* ── Idle-timeout warning banner ───────────────────────────────────── */}
+      {activeLab && remainingMs !== null && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '10px 18px',
+            borderRadius: 12,
+            marginBottom: 16,
+            background: isExpiringSoon ? 'rgba(239,68,68,0.15)' : 'rgba(123,97,255,0.12)',
+            border: `1px solid ${isExpiringSoon ? 'rgba(239,68,68,0.4)' : 'rgba(123,97,255,0.3)'}`,
+            transition: 'all 0.4s ease'
+          }}
+        >
+          <span style={{ fontSize: '1.2rem' }}>{isExpiringSoon ? '⚠️' : '⏱️'}</span>
+          <div style={{ flex: 1 }}>
+            <span style={{ color: isExpiringSoon ? '#fca5a5' : '#c4b5fd', fontWeight: 600, fontSize: '0.9rem' }}>
+              {activeLab.name} is running
+            </span>
+            <span style={{ color: 'rgba(240,242,248,0.55)', fontSize: '0.82rem', marginLeft: 8 }}>
+              — auto-stops in
+            </span>
+            <span style={{
+              marginLeft: 8,
+              fontFamily: 'monospace',
+              fontWeight: 700,
+              fontSize: '0.95rem',
+              color: isExpiringSoon ? '#f87171' : '#a78bfa'
+            }}>
+              {fmtCountdown(remainingMs)}
+            </span>
+          </div>
+          <button
+            onClick={() => activeLab?.id && axios.post(`/api/labs/${activeLab.id}/heartbeat`)
+              .then(r => setRemainingMs(r.data.remainingMs))
+              .catch(() => {})}
+            style={{
+              background: isExpiringSoon ? 'rgba(239,68,68,0.25)' : 'rgba(123,97,255,0.25)',
+              border: 'none',
+              borderRadius: 8,
+              color: isExpiringSoon ? '#fca5a5' : '#c4b5fd',
+              padding: '4px 12px',
+              fontSize: '0.8rem',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            + Extend
+          </button>
+        </div>
+      )}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h1 style={{ color: T, fontWeight: 700 }}>Cybersecurity Labs</h1>

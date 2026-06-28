@@ -3,10 +3,17 @@ const util = require('util');
 const execPromise = util.promisify(exec);
 const execFilePromise = util.promisify(execFile);
 
+// How long (ms) a container can sit idle before being auto-stopped.
+// Defaults to 30 minutes; override with LAB_TIMEOUT_MINUTES env var.
+const LAB_TIMEOUT_MS = (parseInt(process.env.LAB_TIMEOUT_MINUTES, 10) || 30) * 60 * 1000;
+
 /**
  * Manages lifecycle of lab containers (per user, per lab).
  * Each running container is tracked in-memory. On process restart,
  * the map resets, but docker containers (if any) can still be stopped manually.
+ *
+ * Idle-timeout: containers are auto-stopped after LAB_TIMEOUT_MS of inactivity.
+ * Activity is refreshed by calling touchActivity() (via the /heartbeat endpoint).
  */
 class LabManager {
   constructor() {
@@ -80,6 +87,31 @@ class LabManager {
     return `edusec_lab_${String(labId)}_${String(userId)}`.replace(/[^a-zA-Z0-9_.-]/g, '_');
   }
 
+  /**
+   * Refresh the last-activity timestamp for a running container.
+   * Called by the /heartbeat endpoint every ~3 minutes from the frontend.
+   * @returns {boolean} true if the key was found and updated, false if not tracked
+   */
+  touchActivity(userId, labId) {
+    const key = `${userId}:${labId}`;
+    const info = this.activeLabs.get(key);
+    if (!info) return false;
+    info.lastActivityAt = new Date();
+    return true;
+  }
+
+  /**
+   * Returns remaining idle time in milliseconds for a running container.
+   * Returns null if the container is not tracked.
+   */
+  getRemainingTime(userId, labId) {
+    const key = `${userId}:${labId}`;
+    const info = this.activeLabs.get(key);
+    if (!info) return null;
+    const elapsed = Date.now() - new Date(info.lastActivityAt).getTime();
+    return Math.max(0, LAB_TIMEOUT_MS - elapsed);
+  }
+
   async startLabContainer({ lab, userId }) {
     if (!lab || !lab.dockerImage) {
       throw new Error('This lab is not containerized or dockerImage is missing');
@@ -87,6 +119,8 @@ class LabManager {
 
     const key = `${userId}:${lab._id}`;
     if (this.activeLabs.has(key)) {
+      // Refresh activity on re-start
+      this.activeLabs.get(key).lastActivityAt = new Date();
       return this.activeLabs.get(key);
     }
 
@@ -116,6 +150,7 @@ class LabManager {
       try { if (!/^[\s\S]*$/.test(stderr)) { } } catch (_) { }
     }
 
+    const now = new Date();
     const details = {
       id: containerName,
       status: 'running',
@@ -124,7 +159,9 @@ class LabManager {
       internalPort,
       image: lab.dockerImage,
       accessUrl: `http://localhost:${hostPort}`,
-      startedAt: new Date()
+      startedAt: now,
+      lastActivityAt: now,       // ← idle-timeout tracking
+      timeoutMs: LAB_TIMEOUT_MS  // ← sent to frontend so it knows the limit
     };
 
     this.activeLabs.set(key, details);
@@ -151,7 +188,15 @@ class LabManager {
     try {
       const { stdout } = await execPromise(`${this.dockerCmd} inspect -f '{{.State.Running}}' ${info.containerName}`);
       const running = stdout.includes('true');
-      return { ...info, status: running ? 'running' : 'stopped' };
+      if (!running) {
+        this.activeLabs.delete(key);
+        return { status: 'stopped' };
+      }
+      return {
+        ...info,
+        status: 'running',
+        remainingMs: this.getRemainingTime(userId, labId)
+      };
     } catch (_) {
       this.activeLabs.delete(key);
       return { status: 'stopped' };
@@ -165,6 +210,9 @@ class LabManager {
     if (!info) {
       throw new Error('Lab container is not running. Please start the lab first.');
     }
+
+    // Every terminal command refreshes the idle timer
+    info.lastActivityAt = new Date();
 
     try {
       // Execute command in the container
@@ -186,8 +234,47 @@ class LabManager {
       };
     }
   }
+
+  /**
+   * Sweep all tracked containers and stop any that have been idle
+   * longer than LAB_TIMEOUT_MS. Called by the cron in server.js.
+   * @returns {string[]} list of container names that were stopped
+   */
+  async stopIdleContainers() {
+    const stopped = [];
+    const now = Date.now();
+
+    for (const [key, info] of this.activeLabs.entries()) {
+      const idleMs = now - new Date(info.lastActivityAt).getTime();
+      if (idleMs >= LAB_TIMEOUT_MS) {
+        console.log(`[LabManager] Auto-stopping idle container: ${info.containerName} (idle ${Math.round(idleMs / 60000)} min)`);
+        try {
+          await execPromise(`${this.dockerCmd} rm -f ${info.containerName}`);
+        } catch (_) {
+          // Container may have already exited on its own — still remove from map
+        }
+        this.activeLabs.delete(key);
+        stopped.push(info.containerName);
+      }
+    }
+
+    if (stopped.length > 0) {
+      console.log(`[LabManager] Auto-stopped ${stopped.length} idle container(s):`, stopped);
+    }
+
+    return stopped;
+  }
+
+  /**
+   * Start the background sweeper that runs every 5 minutes.
+   * Call once from server.js after the server starts.
+   */
+  startSweeper() {
+    const SWEEP_INTERVAL_MS = 5 * 60 * 1000; // check every 5 minutes
+    const timeoutMinutes = LAB_TIMEOUT_MS / 60000;
+    console.log(`[LabManager] Idle-container sweeper started (timeout: ${timeoutMinutes} min, check interval: 5 min)`);
+    setInterval(() => this.stopIdleContainers(), SWEEP_INTERVAL_MS);
+  }
 }
 
 module.exports = new LabManager();
-
-
