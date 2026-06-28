@@ -2,6 +2,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const ctfController = require('../controllers/ctf.controller');
+const { validateCtfSubmit } = require('../middleware/inputValidator');
 
 // ─── Admin-Only Middleware ────────────────────────────────────────────────────
 const adminOnly = (req, res, next) => {
@@ -30,11 +31,12 @@ router.post('/challenges',       adminOnly, ctfController.createChallenge);
 router.put('/challenges/:id',    adminOnly, ctfController.updateChallenge);
 router.delete('/challenges/:id', adminOnly, ctfController.deleteChallenge);
 
-// Apply rate limiting middleware to the submit endpoint
-router.post('/submit',           submitLimiter, ctfController.submitFlag);
+// Apply rate limiting and validation middleware to the submit endpoint
+router.post('/submit',           submitLimiter, validateCtfSubmit, ctfController.submitFlag);
 
 router.get('/leaderboard',       ctfController.getLeaderboard);
 router.get('/score',             ctfController.getMyScore);
 router.get('/my-submissions',    ctfController.getMySubmissions);
 
 module.exports = router;
+
