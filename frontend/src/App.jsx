@@ -20,7 +20,7 @@ function App() {
   return (
     <NotificationProvider>
       <AuthProvider>
-        <Router>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <div className="App">
           <Navbar />
           <div className="container mt-3 mt-md-4">
