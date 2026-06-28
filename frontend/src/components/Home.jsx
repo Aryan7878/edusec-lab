@@ -70,7 +70,8 @@ export default function Home() {
 
       const line = terminalLines[currentLine];
       if (currentChar < line.length) {
-        setTypedText(prev => prev + line[currentChar]);
+        const char = line[currentChar];
+        setTypedText(prev => prev + char);
         currentChar++;
       } else {
         setTypedText(prev => prev + '\n');
