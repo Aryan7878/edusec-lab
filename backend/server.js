@@ -287,6 +287,21 @@ app.post('/api/labs/:id/stop', auth, async (req, res) => {
   }
 });
 
+// Heartbeat — keeps a running lab container alive (resets idle timer)
+// Frontend calls this every 3 minutes while the lab tab is open.
+app.post('/api/labs/:id/heartbeat', auth, async (req, res) => {
+  try {
+    const touched = LabManager.touchActivity(req.user._id, req.params.id);
+    if (!touched) {
+      return res.status(404).json({ message: 'Lab not running' });
+    }
+    const remainingMs = LabManager.getRemainingTime(req.user._id, req.params.id);
+    res.json({ success: true, remainingMs });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 // Lab status
 app.get('/api/labs/:id/status', auth, async (req, res) => {
   try {
@@ -424,4 +439,6 @@ if (process.env.NODE_ENV === 'production' || process.env.SERVE_STATIC === 'true'
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  // Start idle-container sweeper (stops labs inactive for > 30 min)
+  LabManager.startSweeper();
 });
