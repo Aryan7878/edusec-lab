@@ -40,6 +40,12 @@ const VMManager  = require('./services/vmManager');
 
 // Routes
 const ctfRoutes  = require('./routes/ctf.routes');
+const {
+  validateRegister,
+  validateLogin,
+  validateResetPassword,
+  validateCommand
+} = require('./middleware/inputValidator');
 
 // Auth middleware
 const auth = async (req, res, next) => {
@@ -61,22 +67,9 @@ const auth = async (req, res, next) => {
 };
 
 // Register
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', validateRegister, async (req, res) => {
   try {
     const { username, email, password } = req.body;
-
-    // Input validation
-    if (!username || !email || !password) {
-      return res.status(400).json({ message: 'Username, email, and password are required' });
-    }
-
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
-    }
-
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ message: 'Invalid email format' });
-    }
 
     // Check if user exists
     let user = await User.findOne({ $or: [{ email }, { username }] });
@@ -119,14 +112,9 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 // Login
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', validateLogin, async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    // Input validation
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' });
-    }
 
     // Check if user exists
     const user = await User.findOne({ email });
@@ -163,17 +151,9 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // Reset Password
-app.post('/api/auth/reset-password', async (req, res) => {
+app.post('/api/auth/reset-password', validateResetPassword, async (req, res) => {
   try {
     const { email, newPassword } = req.body;
-
-    if (!email || !newPassword) {
-      return res.status(400).json({ message: 'Email and new password are required' });
-    }
-
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
-    }
 
     const user = await User.findOne({ email });
     if (!user) {
@@ -313,13 +293,9 @@ app.get('/api/labs/:id/status', auth, async (req, res) => {
 });
 
 // Execute command in lab container
-app.post('/api/labs/:id/execute', auth, async (req, res) => {
+app.post('/api/labs/:id/execute', auth, validateCommand, async (req, res) => {
   try {
     const { command } = req.body;
-
-    if (!command || typeof command !== 'string') {
-      return res.status(400).json({ message: 'Command is required' });
-    }
 
     const result = await LabManager.executeCommand({
       labId: req.params.id,
@@ -384,13 +360,9 @@ app.post('/api/vm/stop', auth, async (req, res) => {
 });
 
 // Execute command in VM container
-app.post('/api/vm/execute', auth, async (req, res) => {
+app.post('/api/vm/execute', auth, validateCommand, async (req, res) => {
   try {
     const { command } = req.body;
-
-    if (!command || typeof command !== 'string') {
-      return res.status(400).json({ message: 'Command is required' });
-    }
 
     const result = await VMManager.executeCommand(req.user._id, command);
     res.json(result);
