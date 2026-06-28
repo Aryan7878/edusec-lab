@@ -1,0 +1,33 @@
+name: Security Audit
+
+on:
+  schedule:
+    - cron: '0 0 * * 1' # Runs every Monday at midnight UTC
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  audit-dependencies:
+    name: Check for Vulnerabilities in Dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+
+      - name: Scan Backend Modules
+        run: |
+          cd backend
+          npm ci
+          npm audit --audit-level=high
+
+      - name: Scan Frontend Modules
+        run: |
+          cd frontend
+          npm ci
+          npm audit --audit-level=high
