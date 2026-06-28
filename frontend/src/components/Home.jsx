@@ -164,7 +164,7 @@ export default function Home() {
       <section className="container py-5">
         <div className="text-center mb-5">
           <h2 className="fw-bold" style={{ color: '#ffffff' }}>Platform Core Features</h2>
-          <p className="text-muted">State-of-the-art sandboxing infrastructure built for interactive education</p>
+          <p style={{ color: 'rgba(240, 242, 248, 0.55)' }}>State-of-the-art sandboxing infrastructure built for interactive education</p>
         </div>
         <div className="row g-4">
           {features.map((c, i) => (
@@ -217,7 +217,7 @@ export default function Home() {
         <div className="container">
           <div className="text-center mb-5">
             <h2 className="fw-bold" style={{ color: '#ffffff' }}>Active Laboratories</h2>
-            <p className="text-muted">Simulate pentesting vectors across standardized environments</p>
+            <p style={{ color: 'rgba(240, 242, 248, 0.55)' }}>Simulate pentesting vectors across standardized environments</p>
           </div>
           <div className="row g-4 justify-content-center">
             {supportedLabs.map((lab, i) => (
@@ -235,7 +235,7 @@ export default function Home() {
                     <i className={`bi ${lab.icon}`} style={{ fontSize: '1.5rem', color: '#7b61ff' }}></i>
                   </div>
                   <h6 className="fw-bold mb-2 text-start" style={{ color: '#ffffff' }}>{lab.name}</h6>
-                  <p className="text-muted mb-0 text-start" style={{ fontSize: '0.85rem' }}>{lab.tag}</p>
+                  <p className="mb-0 text-start" style={{ fontSize: '0.85rem', color: 'rgba(240, 242, 248, 0.48)' }}>{lab.tag}</p>
                 </div>
               </div>
             ))}
@@ -246,7 +246,7 @@ export default function Home() {
       {/* Architecture overview */}
       <section className="container py-5 text-center">
         <h2 className="fw-bold mb-3" style={{ color: '#ffffff' }}>Architecture Overview</h2>
-        <p className="text-muted mb-5">Micro-isolated web endpoints secure database integrity and student containers</p>
+        <p className="mb-5" style={{ color: 'rgba(240, 242, 248, 0.55)' }}>Micro-isolated web endpoints secure database integrity and student containers</p>
         <div
           className="p-4 shadow-lg mx-auto"
           style={{
@@ -285,7 +285,7 @@ export default function Home() {
       <section className="container py-5">
         <div className="text-center mb-5">
           <h2 className="fw-bold" style={{ color: '#ffffff' }}>Demonstration Video</h2>
-          <p className="text-muted">Take a visual tour of lab orchestration and the CTF arena</p>
+          <p style={{ color: 'rgba(240, 242, 248, 0.55)' }}>Take a visual tour of lab orchestration and the CTF arena</p>
         </div>
         <div
           className="ratio ratio-16x9 mx-auto shadow-lg"
@@ -308,7 +308,8 @@ export default function Home() {
       {/* Branding Tech Grid */}
       <section className="py-5" style={{ background: 'rgba(18, 22, 34, 0.3)' }}>
         <div className="container text-center">
-          <h5 className="text-muted text-uppercase mb-4" style={{ fontSize: '0.8rem', letterSpacing: '0.1em' }}>Technologies Fueling the Platform</h5>
+          <h5 className="text-uppercase mb-4" style={{ fontSize: '0.8rem', letterSpacing: '0.1em', color: 'rgba(240, 242, 248, 0.45)' }}>Technologies Fueling the Platform</h5>
+
           <div className="d-flex flex-wrap justify-content-center align-items-center gap-4">
             {['React', 'NodeJS', 'Express', 'MongoDB', 'Docker', 'Vite', 'xterm.js', 'Bootstrap'].map((tech, i) => (
               <span
