@@ -1,0 +1,386 @@
+openapi: 3.0.3
+info:
+  title: EduSec Labs API
+  description: REST API specification for the EduSec Labs cybersecurity learning platform. Exposes authorization, target sandbox control, terminal command execution, CTF flag submission, and AI Cyber Tutor endpoints.
+  version: 1.0.0
+servers:
+  - url: http://localhost:5000/api
+    description: Local development backend server
+paths:
+  /auth/register:
+    post:
+      summary: Register a new student account
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - email
+                - password
+              properties:
+                username:
+                  type: string
+                  example: testuser123
+                email:
+                  type: string
+                  format: email
+                  example: testuser@edusec.com
+                password:
+                  type: string
+                  minLength: 6
+                  example: TestPass123!
+      responses:
+        '201':
+          description: User registered successfully. Returns authentication token.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      username:
+                        type: string
+                      email:
+                        type: string
+                      level:
+                        type: string
+        '400':
+          description: Validation failure or user already exists.
+
+  /auth/login:
+    post:
+      summary: Log into an existing account
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: testuser@edusec.com
+                password:
+                  type: string
+                  example: TestPass123!
+      responses:
+        '200':
+          description: Authentication successful. Returns JWT token.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      username:
+                        type: string
+                      email:
+                        type: string
+                      level:
+                        type: string
+                      badges:
+                        type: array
+                        items:
+                          type: string
+        '400':
+          description: Invalid login credentials.
+
+  /labs:
+    get:
+      summary: Retrieve all labs with user progress details
+      operationId: getLabs
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    _id:
+                      type: string
+                    name:
+                      type: string
+                    description:
+                      type: string
+                    difficulty:
+                      type: string
+                    category:
+                      type: string
+                    dockerImage:
+                      type: string
+                    port:
+                      type: integer
+                    userProgress:
+                      type: object
+                      properties:
+                        status:
+                          type: string
+                          enum: [not_started, in_progress, completed]
+                        score:
+                          type: integer
+
+  /labs/{id}/start:
+    post:
+      summary: Start a Docker container for a target lab
+      operationId: startLab
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Container started successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  lab:
+                    type: object
+                    properties:
+                      labId:
+                        type: string
+                      status:
+                        type: string
+                      accessUrl:
+                        type: string
+                      hostPort:
+                        type: integer
+                      containerName:
+                        type: string
+                      timeoutMs:
+                        type: integer
+        '404':
+          description: Target lab not found.
+
+  /labs/{id}/stop:
+    post:
+      summary: Stop and remove a running lab container
+      operationId: stopLab
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lab container removed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /labs/{id}/heartbeat:
+    post:
+      summary: Refresh inactivity timeout timer for a running container
+      operationId: heartbeatLab
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Inactivity reset complete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  remainingMs:
+                    type: integer
+
+  /labs/{id}/execute:
+    post:
+      summary: Run a command inside a lab container
+      operationId: executeLabCommand
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - command
+              properties:
+                command:
+                  type: string
+                  example: ls -la
+      responses:
+        '200':
+          description: Command execution complete
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  output:
+                    type: string
+
+  /ctf/challenges:
+    get:
+      summary: Retrieve list of CTF challenges
+      operationId: getChallenges
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    _id:
+                      type: string
+                    title:
+                      type: string
+                    description:
+                      type: string
+                    category:
+                      type: string
+                    difficulty:
+                      type: string
+                    points:
+                      type: integer
+                    isSolved:
+                      type: boolean
+
+  /ctf/submit:
+    post:
+      summary: Submit a challenge flag candidate
+      operationId: submitFlag
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - challengeId
+                - flag
+              properties:
+                challengeId:
+                  type: string
+                  example: 64df58e11a2f6c0d8847e62a
+                flag:
+                  type: string
+                  example: flag{xss_reflected_success}
+      responses:
+        '200':
+          description: Submission processed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  correct:
+                    type: boolean
+                  message:
+                    type: string
+                  pointsAwarded:
+                    type: integer
+
+  /ai/assist:
+    post:
+      summary: Consult the AI Cyber Tutor for guide tips
+      operationId: getAIAssistance
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - message
+              properties:
+                message:
+                  type: string
+                  maxLength: 2000
+                  example: How do I identify directories with gobuster?
+                labId:
+                  type: string
+                context:
+                  type: object
+      responses:
+        '200':
+          description: Tutor response generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  response:
+                    type: string
+                  usedModel:
+                    type: string
+                  usedKB:
+                    type: array
+                    items:
+                      type: string
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

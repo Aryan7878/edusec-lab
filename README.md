@@ -1,240 +1,198 @@
-# EduSec Labs
+# EduSec Labs ⚡
 
-EduSec Labs is a comprehensive cybersecurity education platform designed to provide hands-on experience with ethical hacking and vulnerability testing. It features a modern React frontend, a robust Node.js/Express backend, and integrated virtualized environments using Vagrant (Kali Linux) and Docker (DVWA).
+[![CI Build & Lint](https://github.com/Aryan7878/edusec-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/Aryan7878/edusec-lab/actions)
+[![License: MIT](https://img.shields.github.com/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Docker Image](https://img.shields.github.com/badge/Docker-Enabled-blue.svg)](https://hub.docker.com/)
+[![Node Version](https://img.shields.github.com/badge/Node.js-18.x-green.svg)](https://nodejs.org/)
 
-## Features
+EduSec Labs is an **AI-powered, browser-based cybersecurity learning platform** designed to provide hands-on security training inside isolated on-demand Docker labs. 
 
--   **Interactive Dashboard**: A user-friendly interface to manage labs and track progress.
--   **Virtual Labs**:
-    -   **Kali Linux**: Full-fledged Kali Linux environment managed via Vagrant for finding and exploiting vulnerabilities.
-    -   **DVWA (Damn Vulnerable Web App)**: Dockerized vulnerable web application for practicing web attacks.
--   **Terminal Integration**: Web-based terminal (xterm.js) to interact with lab environments directly from the browser.
--   **Progress Tracking**: Track your completion status and scores for different labs.
--   **AI Tutor**: Integrated AI assistant to help guide you through labs and explain concepts.
+Students can spin up vulnerable targets, control preconfigured pentesting tools, and get hints from a Socratic AI coach—all from a single, clean web interface.
 
-## Technology Stack
+---
 
-### Frontend
--   **React**: UI library for building the user interface.
--   **Vite**: Next Generation Frontend Tooling.
--   **Bootstrap**: CSS framework for responsive design.
--   **xterm.js**: For embedding a terminal in the browser.
--   **Axios**: For making HTTP requests to the backend.
+## 🚀 Key Features
 
-### Backend
--   **Node.js & Express**: Server-side runtime and web framework.
--   **MongoDB & Mongoose**: NoSQL database for storing user data, lab info, and progress.
--   **JWT (JSON Web Tokens)**: For secure user authentication.
--   **Docker Integration**: Interacting with Docker containers for labs.
--   **VirtualBox & Vagrant**: Managing the Kali Linux VM.
+*   **On-Demand Containerized Labs:** Launch targets like DVWA and OWASP Juice Shop in isolated environments with dedicated port allocation.
+*   **Persistent Kali-Lite Workspace:** A browser-accessible Alpine pen-testing container pre-provisioned with standard utilities (`nmap`, `gobuster`, `hydra`, `john`, `sqlmap`, and the `rockyou` wordlist).
+*   **Integrated Socratic AI Tutor:** A GPT-4o-mini-powered tutor that explains concepts, checks console errors, and guides you to solutions without giving away raw exploitation keys.
+*   **Interactive Web Terminal:** Execute commands inside target containers directly from the web panel powered by `xterm.js`.
+*   **Capture The Flag (CTF) Mode:** Solve realistic challenges, submit flags, accumulate points, and compete on the live leaderboard.
+*   **Automatic Lifespans & Sweeper:** Protects server resources with automated 30-minute inactivity timeouts for labs and workspace containers.
 
-## Prerequisites
+---
 
-Before setting up the project, ensure you have the following installed:
+## 📸 Screenshots
 
--   **Node.js** (v18 or higher)
--   **npm** (Node Package Manager)
--   **MongoDB** (running locally or a cloud URI)
--   **Docker Desktop** (for containerized labs like DVWA)
--   **VirtualBox** (for Kali Linux VM)
--   **Vagrant** (for managing the Kali VM)
+| Landing Portal | Student Dashboard |
+| :---: | :---: |
+| ![Landing Page](docs/assets/hero-landing.png) | ![Dashboard](docs/assets/dashboard-stats.png) |
 
-## Installation & Setup
+| Vulnerability Lab Workstation | AI Cyber Coach |
+| :---: | :---: |
+| ![Labs Panel](docs/assets/labs-panel.png) | ![AI Tutor](docs/assets/ai-tutor.png) |
 
-### 1. Clone the Repository
+---
 
-```bash
-git clone https://github.com/yourusername/edusec-labs.git
-cd edusec-labs
+## 🛠️ Architecture
+
+EduSec Labs uses Express.js on the backend to interact directly with the host system's Docker socket via Node child processes, allocating ports dynamically and maintaining state tracking.
+
+```mermaid
+graph TB
+    subgraph Client [Browser Client]
+        React[React SPA]
+        Xterm[xterm.js Terminal]
+    end
+
+    subgraph Backend [Express API Server]
+        Auth[Auth Middleware]
+        Router[API Router]
+        LM[LabManager]
+        VMM[VMManager]
+        Tutor[AITutor]
+    end
+
+    subgraph Infrastructure [Target Nodes]
+        Docker[Docker Engine]
+        DB[(MongoDB)]
+    end
+
+    React -->|REST Request| Auth
+    Auth --> Router
+    Router --> LM
+    Router --> VMM
+    Router --> Tutor
+    LM -->|Manage Socket| Docker
+    VMM -->|Manage Socket| Docker
+    Router --> DB
 ```
 
-### 2. Backend Setup
+---
 
-Navigate to the backend directory:
+## 🧰 Tech Stack
 
+*   **Frontend:** React (v18), Vite, Bootstrap (v5), xterm.js
+*   **Backend:** Node.js, Express.js, JWT, bcryptjs, express-rate-limit
+*   **Database:** MongoDB, Mongoose
+*   **Infrastructure:** Docker, Docker Compose
+*   **AI Engine:** OpenAI GPT-4o-mini API / Offline Local Knowledge Base
+
+---
+
+## ⚙️ Environment Variables
+
+Copy the template configuration before startup:
+```bash
+cp .env.example backend/.env
+```
+
+| Variable | Description | Default |
+|---|---|---|
+| `NODE_ENV` | Application environment status (`development` or `production`) | `production` |
+| `PORT` | Local host port of backend server | `5000` |
+| `SERVE_STATIC` | Serve bundled static react page from backend server | `true` |
+| `MONGODB_URI` | Connection URI for the MongoDB database | `mongodb://mongodb:27017/edusec-labs` |
+| `JWT_SECRET` | Secret key used for signing authentication payloads | `change-this-to-a-secure-random-key` |
+| `CORS_ORIGIN` | Allowed domains for cross-origin API headers | `*` |
+| `LAB_TIMEOUT_MINUTES` | Minutes allowed before shutting down idle workspaces | `30` |
+| `OPENAI_API_KEY` | Optional API key used for full Socratic AI Tutor capabilities | (offline KB fallback) |
+
+---
+
+## 🚦 Installation & Local Development
+
+### Prerequisites
+*   Node.js (v18 or higher)
+*   MongoDB (v6.0 or cloud instance)
+*   Docker Engine / Docker Desktop
+
+### 1. Clone & Setup Workspace
+```bash
+git clone https://github.com/Aryan7878/edusec-lab.git
+cd edusec-lab
+```
+
+### 2. Startup Backend Dev Server
 ```bash
 cd backend
-```
-
-Install dependencies:
-
-```bash
 npm install
-```
-
-Create a `.env` file in the `backend` directory with the following variables:
-
-```env
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/edusec-labs
-JWT_SECRET=your_jwt_secret_key
-# OPENAI_API_KEY=your_openai_key # Optional for AI Tutor
-```
-
-Initialize the database with default labs:
-
-```bash
+# Configure your local backend/.env
 npm run init-labs
-```
-
-Start the backend server:
-
-```bash
+npm run init-challenges
 npm run dev
 ```
 
-The backend will run on `http://localhost:5000`.
-
-### 3. Frontend Setup
-
-Open a new terminal and navigate to the frontend directory:
-
+### 3. Startup Frontend Dev Server
 ```bash
-cd frontend
-```
-
-Install dependencies:
-
-```bash
+cd ../frontend
 npm install
-```
-
-Start the development server:
-
-```bash
 npm run dev
 ```
-
-The frontend will run on `http://localhost:5173` (or the port shown in your terminal).
-
-### 4. Lab Environment Setup
-
-#### Docker Labs (DVWA)
-Ensure Docker Desktop is running. The backend will automatically manage the lifecycle of Docker containers when you start a lab from the dashboard.
-
-#### Kali Linux VM
-Navigate to the vagrant directory:
-
-```bash
-cd vagrant
-```
-
-Start the Kali Linux VM (this may take a while to download the box for the first time):
-
-```bash
-vagrant up
-```
-
-Once running, you can access the Kali machine via SSH or through the web terminal if configured.
-
-## Usage
-
-1.  Open your browser and navigate to the frontend URL (e.g., `http://localhost:5173`).
-2.  Register a new account or log in.
-3.  Browse the available labs on the dashboard.
-4.  Click "Start Lab" to spin up the environment (e.g., DVWA).
-5.  Use the provided access details to interact with the vulnerable target.
-6.  Use the AI Assistant if you get stuck or need a hint.
-
-## License
-
-This project is licensed under the MIT License.
+Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ---
 
-## 🚀 Deployment (Free Stack)
+## 🐳 Docker Deployment (Production)
 
-EduSec Labs uses a **split deployment** because the lab environments require a real Docker daemon:
+We package the React production build directly inside the Node server using a multi-stage Docker build.
 
-```
-Cloudflare Pages (FREE) ──API──▶ Oracle Cloud VM (FREE)
-   React frontend                  Node.js + MongoDB + Docker labs
-```
-
-### Part 1 — Backend on Oracle Cloud (Always Free)
-
-> Oracle Cloud gives you a permanent free ARM VM with 4 CPUs + 24 GB RAM — enough for the backend, MongoDB, and multiple Docker lab containers.
-
-#### Step 1 — Create your Oracle Cloud VM
-
-1. Sign up at [cloud.oracle.com](https://cloud.oracle.com) (free, credit card required but never charged)
-2. Create an **Ampere A1** instance → Ubuntu 22.04 → Always Free shape
-3. Note your **VM Public IP**
-4. Open ports **5000** (TCP) in the VM's security list
-
-#### Step 2 — Install Docker on the VM
-
-SSH into your VM and run:
-
+### Build and Run with Docker Compose
 ```bash
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-# Log out and back in for group change to take effect
-```
-
-#### Step 3 — Set up environment variables
-
-```bash
-git clone https://github.com/Aryan7878/edusec-lab.git ~/edusec-labs
-cd ~/edusec-labs
-cp .env.example .env
-nano .env   # Fill in JWT_SECRET and CORS_ORIGIN
-```
-
-Key vars to set:
-```env
-JWT_SECRET=<run: openssl rand -base64 48>
-CORS_ORIGIN=https://your-project.pages.dev
-OPENAI_API_KEY=           # optional
-```
-
-#### Step 4 — Deploy with Docker Compose
-
-```bash
+# Pull images and build the platform
 docker compose -f docker-compose.prod.yml up -d --build
 
-# Seed the database (run once)
-docker exec edusec-labs-app node scripts/initLabs.js
-docker exec edusec-labs-app node scripts/initChallenges.js
+# Populate database structures (run once)
+docker exec -it edusec-labs-app node scripts/initLabs.js
+docker exec -it edusec-labs-app node scripts/initChallenges.js
 ```
+The platform will be live at [http://localhost:5000](http://localhost:5000).
 
-Your backend is now live at `http://<VM-IP>:5000` ✅
+---
 
-#### Step 5 — (Optional) One-command redeploy
+## 📂 Project Structure
 
-From your local machine after pushing changes to GitHub:
-
-```bash
-./deploy.sh <VM-PUBLIC-IP>
+```
+edusec-labs/
+├── .github/workflows/          # CI/CD pipelines
+├── backend/
+│   ├── models/                 # Database schemas
+│   ├── routes/                 # REST controllers
+│   ├── services/               # Container & VM lifecycle services
+│   └── server.js               # Express app core
+├── docs/                       # Technical specs & openapi schemas
+├── frontend/
+│   ├── src/
+│   │   ├── components/         # Dashboard, Terminal, AI Coach panels
+│   │   └── contexts/           # JWT and Global Alert hooks
+│   └── vite.config.js          # Port forwarding & builds
+└── docker-compose.prod.yml     # Standalone Docker compose setup
 ```
 
 ---
 
-### Part 2 — Frontend on Cloudflare Pages
-
-1. Push your code to GitHub
-2. Go to [Cloudflare Pages](https://pages.cloudflare.com) → **Create a project** → Connect GitHub repo
-3. Set build settings:
-   - **Framework preset**: `Vite`
-   - **Build command**: `npm run build`
-   - **Build output directory**: `dist`
-   - **Root directory**: `frontend`
-4. Add an **environment variable** in Cloudflare Pages settings:
-   - `VITE_API_URL` = `http://<YOUR-ORACLE-VM-IP>:5000`
-5. Deploy — Cloudflare builds and hosts your React app globally ✅
-
-> **Important**: After deploying Cloudflare Pages, copy your `.pages.dev` URL and update `CORS_ORIGIN` in your VM's `.env`, then re-run `docker compose -f docker-compose.prod.yml up -d`.
+## 🛡️ Security Features
+*   **Container Isolation:** Per-user namespaced sandboxes prevent container crossover.
+*   **Inactivity Reaping:** Inactivity timers stop orphaned containers.
+*   **Brute-Force Protection:** Rate limiting applied to sensitive endpoints (flag submissions).
+*   **Clean Credential Storage:** Salted SHA-256 password storage via bcrypt.
 
 ---
 
-### Deployment Architecture Summary
+## 🗺️ Roadmap
+*   **Phase 1 (Core Engine):** SQLite fallback database option, strict memory limits on user nodes.
+*   **Phase 2 (Gamification):** Skill Tree modules, achievements, custom badges.
+*   **Phase 3 (Blue Team Labs):** Syslog analysis, ELK monitoring inside containers.
+*   **Phase 4 (Autoscaling):** Kubernetes helm deployment specifications.
 
-| Component | Platform | Cost |
-|-----------|----------|------|
-| React Frontend | Cloudflare Pages | **Free** |
-| Node.js Backend | Oracle Cloud A1 VM | **Free** |
-| MongoDB | Docker on same VM | **Free** |
-| Docker Lab Containers | Docker on same VM | **Free** |
-| SSL/HTTPS | Cloudflare (auto) | **Free** |
+---
 
-**Total monthly cost: $0** 🎉
+## 🤝 Contributing
+
+We welcome community contributions! Please read our [CONTRIBUTING.md](CONTRIBUTING.md) guide for details on branching structures, local setup steps, and formatting standards.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
