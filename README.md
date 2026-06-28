@@ -139,3 +139,102 @@ Once running, you can access the Kali machine via SSH or through the web termina
 ## License
 
 This project is licensed under the MIT License.
+
+---
+
+## 🚀 Deployment (Free Stack)
+
+EduSec Labs uses a **split deployment** because the lab environments require a real Docker daemon:
+
+```
+Cloudflare Pages (FREE) ──API──▶ Oracle Cloud VM (FREE)
+   React frontend                  Node.js + MongoDB + Docker labs
+```
+
+### Part 1 — Backend on Oracle Cloud (Always Free)
+
+> Oracle Cloud gives you a permanent free ARM VM with 4 CPUs + 24 GB RAM — enough for the backend, MongoDB, and multiple Docker lab containers.
+
+#### Step 1 — Create your Oracle Cloud VM
+
+1. Sign up at [cloud.oracle.com](https://cloud.oracle.com) (free, credit card required but never charged)
+2. Create an **Ampere A1** instance → Ubuntu 22.04 → Always Free shape
+3. Note your **VM Public IP**
+4. Open ports **5000** (TCP) in the VM's security list
+
+#### Step 2 — Install Docker on the VM
+
+SSH into your VM and run:
+
+```bash
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+# Log out and back in for group change to take effect
+```
+
+#### Step 3 — Set up environment variables
+
+```bash
+git clone https://github.com/Aryan7878/edusec-lab.git ~/edusec-labs
+cd ~/edusec-labs
+cp .env.example .env
+nano .env   # Fill in JWT_SECRET and CORS_ORIGIN
+```
+
+Key vars to set:
+```env
+JWT_SECRET=<run: openssl rand -base64 48>
+CORS_ORIGIN=https://your-project.pages.dev
+OPENAI_API_KEY=           # optional
+```
+
+#### Step 4 — Deploy with Docker Compose
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+
+# Seed the database (run once)
+docker exec edusec-labs-app node scripts/initLabs.js
+docker exec edusec-labs-app node scripts/initChallenges.js
+```
+
+Your backend is now live at `http://<VM-IP>:5000` ✅
+
+#### Step 5 — (Optional) One-command redeploy
+
+From your local machine after pushing changes to GitHub:
+
+```bash
+./deploy.sh <VM-PUBLIC-IP>
+```
+
+---
+
+### Part 2 — Frontend on Cloudflare Pages
+
+1. Push your code to GitHub
+2. Go to [Cloudflare Pages](https://pages.cloudflare.com) → **Create a project** → Connect GitHub repo
+3. Set build settings:
+   - **Framework preset**: `Vite`
+   - **Build command**: `npm run build`
+   - **Build output directory**: `dist`
+   - **Root directory**: `frontend`
+4. Add an **environment variable** in Cloudflare Pages settings:
+   - `VITE_API_URL` = `http://<YOUR-ORACLE-VM-IP>:5000`
+5. Deploy — Cloudflare builds and hosts your React app globally ✅
+
+> **Important**: After deploying Cloudflare Pages, copy your `.pages.dev` URL and update `CORS_ORIGIN` in your VM's `.env`, then re-run `docker compose -f docker-compose.prod.yml up -d`.
+
+---
+
+### Deployment Architecture Summary
+
+| Component | Platform | Cost |
+|-----------|----------|------|
+| React Frontend | Cloudflare Pages | **Free** |
+| Node.js Backend | Oracle Cloud A1 VM | **Free** |
+| MongoDB | Docker on same VM | **Free** |
+| Docker Lab Containers | Docker on same VM | **Free** |
+| SSL/HTTPS | Cloudflare (auto) | **Free** |
+
+**Total monthly cost: $0** 🎉

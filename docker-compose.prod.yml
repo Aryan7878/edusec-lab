@@ -12,22 +12,44 @@ services:
       - "5000:5000"
     environment:
       - PORT=5000
-      - MONGODB_URI=mongodb://mongodb:27017/edusec-labs
-      - JWT_SECRET=change-this-to-a-secure-key-in-prod
       - NODE_ENV=production
+      - SERVE_STATIC=true
+      - MONGODB_URI=mongodb://mongodb:27017/edusec-labs
+      # IMPORTANT: Set this to a strong random secret before deploying
+      - JWT_SECRET=${JWT_SECRET:-change-this-to-a-secure-random-key}
+      # Set to your Cloudflare Pages domain, e.g.: https://edusec.pages.dev
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      # Optional: your OpenAI key for the AI Tutor (leave blank to use offline KB)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     volumes:
+      # Required: gives backend access to host Docker to spin up lab containers
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_healthy
+    networks:
+      - edusec-net
 
   mongodb:
     image: mongo:6.0
     container_name: edusec-labs-db
     restart: always
-    ports:
-      - "27017:27017"
+    expose:
+      - "27017"
     volumes:
       - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - edusec-net
+
+networks:
+  edusec-net:
+    driver: bridge
 
 volumes:
   mongodb_data:
