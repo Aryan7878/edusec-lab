@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
-import axios from 'axios';
+import api from '../api/axios';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
@@ -42,7 +42,7 @@ export default function VMInterface() {
 
   const checkDockerHealth = async () => {
     try {
-      const response = await axios.get('/api/vm/docker-health');
+      const response = await api.get('/api/vm/docker-health');
       setDockerHealthy(response.data.healthy);
     } catch (error) {
       setDockerHealthy(false);
@@ -63,7 +63,7 @@ export default function VMInterface() {
 
   const checkVMStatus = async () => {
     try {
-      const response = await axios.get('/api/vm/status');
+      const response = await api.get('/api/vm/status');
       setVmStatus(response.data.status);
       setVmDetails(response.data);
       
@@ -195,7 +195,7 @@ export default function VMInterface() {
     if (!terminal.current) return;
 
     try {
-      const response = await axios.post('/api/vm/execute', { command: cmd });
+      const response = await api.post('/api/vm/execute', { command: cmd });
       
       if (response.data.success) {
         const output = response.data.output || '';
@@ -217,7 +217,7 @@ export default function VMInterface() {
     let checkInterval = null;
     
     try {
-      const response = await axios.post('/api/vm/start');
+      const response = await api.post('/api/vm/start');
       // Optimistically mark as running and initialize terminal; we'll verify in background
       setVmDetails(response.data.vm);
       setVmStatus('running');
@@ -233,7 +233,7 @@ export default function VMInterface() {
       checkInterval = setInterval(async () => {
         attempts++;
         try {
-          const statusResponse = await axios.get('/api/vm/status');
+          const statusResponse = await api.get('/api/vm/status');
           if (statusResponse.data.status === 'running') {
             clearInterval(checkInterval);
             setLoading(false);
@@ -264,7 +264,7 @@ export default function VMInterface() {
             
             // Try to get more detailed error info
             try {
-              const finalStatus = await axios.get('/api/vm/status');
+              const finalStatus = await api.get('/api/vm/status');
               if (finalStatus.data.status === 'stopped' && finalStatus.data.error) {
                 showNotification({
                   type: 'error',
@@ -366,7 +366,7 @@ export default function VMInterface() {
   const stopVM = async () => {
     setLoading(true);
     try {
-      await axios.post('/api/vm/stop');
+      await api.post('/api/vm/stop');
       setVmStatus('stopped');
       setVmDetails(null);
       

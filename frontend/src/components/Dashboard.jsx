@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import axios from 'axios';
+import api from '../api/axios';
 import { Link } from 'react-router-dom';
 import { getScore } from '../api/ctf.api';
 
@@ -40,7 +40,7 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const { data: labs } = await axios.get('/api/labs');
+      const { data: labs } = await api.get('/api/labs');
       const completed  = labs.filter(l => l.userProgress.status === 'completed').length;
       const inProgress = labs.filter(l => l.userProgress.status === 'in_progress').length;
       const totalScore = labs

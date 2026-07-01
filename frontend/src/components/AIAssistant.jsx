@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import axios from 'axios';
+import api from '../api/axios';
 
 const AIAssistant = () => {
   const { user } = useAuth();
@@ -59,7 +59,7 @@ const AIAssistant = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post('/api/ai/assist', {
+      const response = await api.post('/api/ai/assist', {
         message: inputMessage,
         labId: selectedLab,
         context: {
@@ -140,7 +140,7 @@ const AIAssistant = () => {
     setLoading(true);
     
     // Send to API
-    axios.post('/api/ai/assist', {
+    api.post('/api/ai/assist', {
       message: action.text,
       labId: action.lab,
       context: {

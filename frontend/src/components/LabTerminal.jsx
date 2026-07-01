@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
@@ -217,7 +217,7 @@ export default function LabTerminal({ labId, labName, onClose }) {
         if (!terminal.current) return;
 
         try {
-            const response = await axios.post(`/api/labs/${labId}/execute`, { command: cmd });
+            const response = await api.post(`/api/labs/${labId}/execute`, { command: cmd });
 
             if (response.data.success) {
                 const output = response.data.output || '';
@@ -252,7 +252,7 @@ export default function LabTerminal({ labId, labName, onClose }) {
 
         try {
             const aiLabId = getAILabId(labName);
-            const response = await axios.post('/api/ai/assist', {
+            const response = await api.post('/api/ai/assist', {
                 message: text,
                 labId: aiLabId,
                 context: {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 
 const Login = () => {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -71,7 +71,7 @@ const Login = () => {
     }
 
     try {
-      const response = await axios.post('/api/auth/reset-password', {
+      const response = await api.post('/api/auth/reset-password', {
         email: resetData.email,
         newPassword: resetData.newPassword
       });

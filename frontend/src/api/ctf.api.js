@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from './axios';
 
 /**
  * CTF Flag System API Client Layer
@@ -12,7 +12,7 @@ const BASE_URL = '/api/ctf';
  * @returns {Promise<Array>} List of challenges (with isSolved status, without flags)
  */
 export const getChallenges = async () => {
-  const response = await axios.get(`${BASE_URL}/challenges`);
+  const response = await api.get(`${BASE_URL}/challenges`);
   return response.data;
 };
 
@@ -23,7 +23,7 @@ export const getChallenges = async () => {
  * @returns {Promise<Object>} Verification results { correct, alreadySolved, pointsAwarded, message }
  */
 export const submitFlag = async (challengeId, flag) => {
-  const response = await axios.post(`${BASE_URL}/submit`, { challengeId, flag });
+  const response = await api.post(`${BASE_URL}/submit`, { challengeId, flag });
   return response.data;
 };
 
@@ -32,7 +32,7 @@ export const submitFlag = async (challengeId, flag) => {
  * @returns {Promise<Object>} Leaderboard lists and user rank metrics
  */
 export const getLeaderboard = async () => {
-  const response = await axios.get(`${BASE_URL}/leaderboard`);
+  const response = await api.get(`${BASE_URL}/leaderboard`);
   return response.data;
 };
 
@@ -41,6 +41,7 @@ export const getLeaderboard = async () => {
  * @returns {Promise<Object>} Score and breakdown details
  */
 export const getScore = async () => {
-  const response = await axios.get(`${BASE_URL}/score`);
+  const response = await api.get(`${BASE_URL}/score`);
   return response.data;
 };
+

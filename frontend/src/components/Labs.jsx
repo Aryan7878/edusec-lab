@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../api/axios';
 import LabTerminal from './LabTerminal';
 import LabDetails from './LabDetails';
 
@@ -57,7 +57,7 @@ const Labs = () => {
     // Send heartbeat every 3 minutes
     const sendHeartbeat = async () => {
       try {
-        const res = await axios.post(`/api/labs/${activeLab.id}/heartbeat`);
+        const res = await api.post(`/api/labs/${activeLab.id}/heartbeat`);
         if (res.data?.remainingMs !== undefined) {
           setRemainingMs(res.data.remainingMs);
         }
@@ -112,7 +112,7 @@ const Labs = () => {
 
   const fetchLabs = async () => {
     try {
-      const response = await axios.get('/api/labs');
+      const response = await api.get('/api/labs');
       setLabs(response.data);
     } catch (error) {
       console.error('Error fetching labs:', error);
@@ -130,7 +130,7 @@ const Labs = () => {
   const startLab = async (labId) => {
     setStartingLab(labId);
     try {
-      const response = await axios.post(`/api/labs/${labId}/start`);
+      const response = await api.post(`/api/labs/${labId}/start`);
 
       if (response.data.lab) {
         setLabs(prevLabs =>
@@ -181,7 +181,7 @@ const Labs = () => {
   const stopLab = async (labId) => {
     setStoppingLab(labId);
     try {
-      await axios.post(`/api/labs/${labId}/stop`);
+      await api.post(`/api/labs/${labId}/stop`);
       const selected = labs.find(l => l._id === labId);
       setLabs(prevLabs =>
         prevLabs.map(lab =>
@@ -299,7 +299,7 @@ const Labs = () => {
             </span>
           </div>
           <button
-            onClick={() => activeLab?.id && axios.post(`/api/labs/${activeLab.id}/heartbeat`)
+            onClick={() => activeLab?.id && api.post(`/api/labs/${activeLab.id}/heartbeat`)
               .then(r => setRemainingMs(r.data.remainingMs))
               .catch(() => {})}
             style={{
